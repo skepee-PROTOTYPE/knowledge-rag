@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge RAG - AI Course Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+        
+        .tabs {
+            display: flex;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+        }
+        
+        .tab-button {
+            flex: 1;
+            padding: 20px;
+            background: #f8f9fa;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border-bottom: 3px solid transparent;
+        }
+        
+        .tab-button.active {
+            background: white;
+            border-bottom-color: #667eea;
+            color: #667eea;
+        }
+        
+        .tab-button:hover {
+            background: #e9ecef;
+        }
+        
+        .tab-content {
+            display: none;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .form-group {
+            margin-bottom: 25px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+        
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .form-row .form-group {
+            flex: 1;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            width: 100%;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            margin-top: 10px;
+        }
+        
+        .result {
+            margin-top: 30px;
+            padding: 25px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .result h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .course-outline {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            border: 1px solid #e9ecef;
+        }
+        
+        .module {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        
+        .quiz-question {
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .quiz-options {
+            margin: 15px 0;
+        }
+        
+        .quiz-option {
+            margin: 8px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        .quiz-option:hover {
+            background: #e9ecef;
+        }
+        
+        .quiz-option.correct {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .sources {
+            margin-top: 20px;
+            padding: 15px;
+            background: #e3f2fd;
+            border-radius: 6px;
+        }
+        
+        .sources h4 {
+            margin-bottom: 10px;
+            color: #1976d2;
+        }
+        
+        .sources a {
+            color: #1976d2;
+            text-decoration: none;
+            margin-right: 15px;
+        }
+        
+        .sources a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 AI Course Generator</h1>
+            <p>Create Personalized Courses with Wikipedia Knowledge</p>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab-button active" onclick="switchTab('ask')">Ask Questions</button>
+            <button class="tab-button" onclick="switchTab('course')">Generate Course</button>
+            <button class="tab-button" onclick="switchTab('quiz')">Create Quiz</button>
+        </div>
+        
+        <!-- Ask Questions Tab -->
+        <div id="ask-tab" class="tab-content active">
+            <div class="form-group">
+                <label for="question">Ask any question and get AI-powered answers with Wikipedia sources:</label>
+                <textarea id="question" rows="3" placeholder="e.g., What is machine learning and how does it work?"></textarea>
+            </div>
+            <button class="btn" onclick="askQuestion()">Get Answer</button>
+            
+            <div id="ask-loading" class="loading">
+                <div class="spinner"></div>
+                <p>Searching Wikipedia and generating answer...</p>
+            </div>
+            
+            <div id="ask-result" class="result" style="display: none;">
+                <h3>Answer</h3>
+                <div id="answer-content"></div>
+                <div id="answer-sources" class="sources" style="display: none;">
+                    <h4>Sources</h4>
+                    <div id="sources-list"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Generate Course Tab -->
+        <div id="course-tab" class="tab-content">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="course-topic">Course Topic:</label>
+                    <input type="text" id="course-topic" placeholder="e.g., Python Programming, World History, Physics">
+                </div>
+                <div class="form-group">
+                    <label for="course-level">Level:</label>
+                    <select id="course-level">
+                        <option value="beginner">Beginner</option>
+                        <option value="intermediate">Intermediate</option>
+                        <option value="advanced">Advanced</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn" onclick="generateCourse()">Generate Full Course</button>
+            <button class="btn btn-secondary" onclick="generateOutline()">Just Course Outline (Faster)</button>
+            
+            <div id="course-loading" class="loading">
+                <div class="spinner"></div>
+                <p>Creating your personalized course from Wikipedia content...</p>
+            </div>
+            
+            <div id="course-result" class="result" style="display: none;">
+                <h3>Generated Course</h3>
+                <div id="course-content"></div>
+            </div>
+        </div>
+        
+        <!-- Create Quiz Tab -->
+        <div id="quiz-tab" class="tab-content">
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="quiz-topic">Quiz Topic:</label>
+                    <input type="text" id="quiz-topic" placeholder="e.g., Solar System, Renaissance Art, Chemistry">
+                </div>
+                <div class="form-group">
+                    <label for="quiz-questions">Number of Questions:</label>
+                    <select id="quiz-questions">
+                        <option value="5">5 Questions</option>
+                        <option value="10" selected>10 Questions</option>
+                        <option value="15">15 Questions</option>
+                        <option value="20">20 Questions</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn" onclick="generateQuiz()">Generate Quiz</button>
+            
+            <div id="quiz-loading" class="loading">
+                <div class="spinner"></div>
+                <p>Creating quiz questions from Wikipedia content...</p>
+            </div>
+            
+            <div id="quiz-result" class="result" style="display: none;">
+                <h3>Generated Quiz</h3>
+                <div id="quiz-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Remove active class from all buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // Add active class to clicked button
+            event.target.classList.add('active');
+        }
+        
+        async function askQuestion() {
+            const question = document.getElementById('question').value.trim();
+            if (!question) {
+                alert('Please enter a question');
+                return;
+            }
+            
+            showLoading('ask');
+            hideResult('ask');
+            
+            try {
+                const response = await fetch('/api/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ question: question })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                displayAnswer(data);
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                hideLoading('ask');
+            }
+        }
+        
+        async function generateCourse() {
+            const topic = document.getElementById('course-topic').value.trim();
+            const level = document.getElementById('course-level').value;
+            
+            if (!topic) {
+                alert('Please enter a course topic');
+                return;
+            }
+            
+            showLoading('course');
+            hideResult('course');
+            
+            try {
+                const response = await fetch('/api/course/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ topic: topic, level: level })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                displayCourse(data.course);
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                hideLoading('course');
+            }
+        }
+        
+        async function generateOutline() {
+            const topic = document.getElementById('course-topic').value.trim();
+            const level = document.getElementById('course-level').value;
+            
+            if (!topic) {
+                alert('Please enter a course topic');
+                return;
+            }
+            
+            showLoading('course');
+            hideResult('course');
+            
+            try {
+                const response = await fetch('/api/course/outline', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ topic: topic, level: level })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                displayCourseOutline(data.outline);
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                hideLoading('course');
+            }
+        }
+        
+        async function generateQuiz() {
+            const topic = document.getElementById('quiz-topic').value.trim();
+            const numQuestions = document.getElementById('quiz-questions').value;
+            
+            if (!topic) {
+                alert('Please enter a quiz topic');
+                return;
+            }
+            
+            showLoading('quiz');
+            hideResult('quiz');
+            
+            try {
+                const response = await fetch('/api/quiz/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ topic: topic, num_questions: parseInt(numQuestions) })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                displayQuiz(data.quiz, data.topic);
+                
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                hideLoading('quiz');
+            }
+        }
+        
+        function showLoading(type) {
+            document.getElementById(type + '-loading').style.display = 'block';
+        }
+        
+        function hideLoading(type) {
+            document.getElementById(type + '-loading').style.display = 'none';
+        }
+        
+        function hideResult(type) {
+            document.getElementById(type + '-result').style.display = 'none';
+        }
+        
+        function displayAnswer(data) {
+            const resultDiv = document.getElementById('ask-result');
+            const contentDiv = document.getElementById('answer-content');
+            const sourcesDiv = document.getElementById('answer-sources');
+            const sourcesList = document.getElementById('sources-list');
+            
+            contentDiv.innerHTML = `<p>${data.answer.replace(/\n/g, '<br>')}</p>`;
+            
+            if (data.sources && data.sources.length > 0) {
+                sourcesList.innerHTML = data.sources.map(source => 
+                    `<a href="${source.url}" target="_blank">[${source.index}] ${source.title}</a>`
+                ).join('');
+                sourcesDiv.style.display = 'block';
+            } else {
+                sourcesDiv.style.display = 'none';
+            }
+            
+            resultDiv.style.display = 'block';
+        }
+        
+        function displayCourse(course) {
+            const resultDiv = document.getElementById('course-result');
+            const contentDiv = document.getElementById('course-content');
+            
+            let html = `
+                <div class="course-outline">
+                    <h2>${course.course_title}</h2>
+                    <p><strong>Level:</strong> ${course.level}</p>
+                    <p><strong>Description:</strong> ${course.description}</p>
+                    <p><strong>Duration:</strong> ${course.total_duration || 'Varies'}</p>
+                    
+                    <h3>Learning Objectives:</h3>
+                    <ul>
+                        ${course.learning_objectives ? course.learning_objectives.map(obj => `<li>${obj}</li>`).join('') : ''}
+                    </ul>
+                    
+                    <h3>Course Modules:</h3>
+            `;
+            
+            if (course.modules) {
+                course.modules.forEach(module => {
+                    html += `
+                        <div class="module">
+                            <h4>Module ${module.module_number}: ${module.title}</h4>
+                            <p><strong>Duration:</strong> ${module.duration || 'Not specified'}</p>
+                            <p><strong>Topics:</strong> ${module.topics ? module.topics.join(', ') : 'Not specified'}</p>
+                            <p><strong>Assessment:</strong> ${module.assessment || 'Not specified'}</p>
+                        </div>
+                    `;
+                });
+            }
+            
+            html += '</div>';
+            
+            contentDiv.innerHTML = html;
+            resultDiv.style.display = 'block';
+        }
+        
+        function displayCourseOutline(outline) {
+            displayCourse(outline);
+        }
+        
+        function displayQuiz(quiz, topic) {
+            const resultDiv = document.getElementById('quiz-result');
+            const contentDiv = document.getElementById('quiz-content');
+            
+            let html = `<h2>Quiz: ${topic}</h2>`;
+            
+            quiz.forEach((question, index) => {
+                html += `
+                    <div class="quiz-question">
+                        <h4>Question ${index + 1}</h4>
+                        <p>${question.question}</p>
+                        <div class="quiz-options">
+                `;
+                
+                Object.entries(question.options || {}).forEach(([key, value]) => {
+                    const isCorrect = key === question.correct_answer;
+                    html += `
+                        <div class="quiz-option ${isCorrect ? 'correct' : ''}" onclick="toggleExplanation(this, '${question.explanation || ''}')">
+                            <strong>${key}:</strong> ${value}
+                            ${isCorrect ? ' ✓' : ''}
+                        </div>
+                    `;
+                });
+                
+                html += `
+                        </div>
+                        <div class="explanation" style="display: none; margin-top: 10px; padding: 10px; background: #f0f8f0; border-radius: 4px;">
+                            <strong>Explanation:</strong> ${question.explanation || 'No explanation provided'}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            contentDiv.innerHTML = html;
+            resultDiv.style.display = 'block';
+        }
+        
+        function toggleExplanation(element, explanation) {
+            const questionDiv = element.closest('.quiz-question');
+            const explanationDiv = questionDiv.querySelector('.explanation');
+            
+            if (explanationDiv.style.display === 'none') {
+                explanationDiv.style.display = 'block';
+            } else {
+                explanationDiv.style.display = 'none';
+            }
+        }
+    </script>
+</body>
+</html>

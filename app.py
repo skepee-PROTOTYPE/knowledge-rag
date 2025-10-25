@@ -265,6 +265,12 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/course')
+def course():
+    """Serve the course generation interface."""
+    return render_template('course.html')
+
+
 @app.route('/api/ask', methods=['POST'])
 def ask_question():
     """Handle question submission with rate limiting and validation."""
@@ -371,6 +377,159 @@ def get_stats():
             'total_chunks': 0,
             'total_articles': 0
         })
+
+
+@app.route('/api/course/generate', methods=['POST'])
+def generate_course():
+    """Generate a structured course from a topic."""
+    try:
+        from course_generator import WikipediaCourseSystem
+        
+        # Apply rate limiting if available
+        try:
+            from rate_limiter import limiter
+            client_id = request.headers.get('X-Forwarded-For', request.remote_addr)
+            if not limiter.is_allowed(client_id, max_requests=5, window_seconds=300):  # 5 courses per 5 min
+                retry_after = limiter.get_retry_after(client_id, 300)
+                logger.warning(f"Course generation rate limit exceeded for {client_id}")
+                return jsonify({
+                    'error': 'Rate limit exceeded for course generation',
+                    'retry_after': retry_after
+                }), 429
+        except ImportError:
+            logger.debug("Rate limiter not available")
+        
+        data = request.json
+        topic = data.get('topic', '').strip()
+        level = data.get('level', 'beginner').strip().lower()
+        
+        if not topic:
+            return jsonify({'error': 'Topic is required'}), 400
+        
+        if len(topic) > 200:
+            return jsonify({'error': 'Topic too long (max 200 characters)'}), 400
+        
+        if level not in ['beginner', 'intermediate', 'advanced']:
+            level = 'beginner'
+        
+        logger.info(f"Generating course for topic: {topic} (level: {level})")
+        
+        # Initialize course system with current app
+        course_system = WikipediaCourseSystem(globals())
+        
+        # Generate course
+        course_data = course_system.create_course(topic, level)
+        
+        logger.info(f"Course generated successfully: {course_data.get('course_title', topic)}")
+        
+        return jsonify({
+            'success': True,
+            'course': course_data,
+            'topic': topic,
+            'level': level
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating course: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to generate course'}), 500
+
+
+@app.route('/api/quiz/generate', methods=['POST'])
+def generate_quiz():
+    """Generate a quiz for a given topic."""
+    try:
+        from course_generator import WikipediaCourseSystem
+        
+        # Apply rate limiting if available
+        try:
+            from rate_limiter import limiter
+            client_id = request.headers.get('X-Forwarded-For', request.remote_addr)
+            if not limiter.is_allowed(client_id, max_requests=10, window_seconds=300):  # 10 quizzes per 5 min
+                retry_after = limiter.get_retry_after(client_id, 300)
+                logger.warning(f"Quiz generation rate limit exceeded for {client_id}")
+                return jsonify({
+                    'error': 'Rate limit exceeded for quiz generation',
+                    'retry_after': retry_after
+                }), 429
+        except ImportError:
+            logger.debug("Rate limiter not available")
+        
+        data = request.json
+        topic = data.get('topic', '').strip()
+        num_questions = data.get('num_questions', 10)
+        
+        if not topic:
+            return jsonify({'error': 'Topic is required'}), 400
+        
+        if len(topic) > 200:
+            return jsonify({'error': 'Topic too long (max 200 characters)'}), 400
+        
+        # Validate number of questions
+        try:
+            num_questions = int(num_questions)
+            if num_questions < 1 or num_questions > 20:
+                num_questions = 10
+        except (ValueError, TypeError):
+            num_questions = 10
+        
+        logger.info(f"Generating quiz for topic: {topic} ({num_questions} questions)")
+        
+        # Initialize course system
+        course_system = WikipediaCourseSystem(globals())
+        
+        # Generate quiz
+        quiz_data = course_system.create_quiz(topic, num_questions)
+        
+        logger.info(f"Quiz generated successfully: {len(quiz_data)} questions")
+        
+        return jsonify({
+            'success': True,
+            'quiz': quiz_data,
+            'topic': topic,
+            'num_questions': len(quiz_data)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating quiz: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to generate quiz'}), 500
+
+
+@app.route('/api/course/outline', methods=['POST'])
+def generate_course_outline():
+    """Generate just a course outline (faster than full course)."""
+    try:
+        from course_generator import CourseGenerator
+        
+        data = request.json
+        topic = data.get('topic', '').strip()
+        level = data.get('level', 'beginner').strip().lower()
+        
+        if not topic:
+            return jsonify({'error': 'Topic is required'}), 400
+        
+        if level not in ['beginner', 'intermediate', 'advanced']:
+            level = 'beginner'
+        
+        logger.info(f"Generating course outline for: {topic} (level: {level})")
+        
+        # Create course generator
+        course_gen = CourseGenerator(client, None)
+        
+        # Generate outline only
+        outline = course_gen.generate_course_outline(topic, level)
+        
+        logger.info(f"Course outline generated: {outline.get('course_title', topic)}")
+        
+        return jsonify({
+            'success': True,
+            'outline': outline,
+            'topic': topic,
+            'level': level
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating course outline: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to generate course outline'}), 500
 
 
 if __name__ == '__main__':
