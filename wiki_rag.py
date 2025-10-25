@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import chromadb
 import wikipediaapi
+import requests
+import time
 from typing import List, Dict
 
 # Load environment variables
@@ -43,14 +45,88 @@ def get_embedding(text: str) -> List[float]:
         model="text-embedding-3-small",
         input=text
     )
+    # Add small delay to avoid rate limits
+    time.sleep(0.1)
     return response.data[0].embedding
 
 
+def get_embeddings_batch(texts: List[str], batch_size: int = 10) -> List[List[float]]:
+    """Get embeddings for multiple texts in batches."""
+    embeddings = []
+    
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+        
+        try:
+            response = client.embeddings.create(
+                model="text-embedding-3-small",
+                input=batch
+            )
+            batch_embeddings = [item.embedding for item in response.data]
+            embeddings.extend(batch_embeddings)
+            
+            # Rate limiting: wait between batches
+            if i + batch_size < len(texts):
+                time.sleep(1)
+                
+        except Exception as e:
+            print(f"  ⚠️ Error getting embeddings for batch {i//batch_size + 1}: {e}")
+            # Fallback to individual requests with longer delays
+            for text in batch:
+                try:
+                    emb = get_embedding(text)
+                    embeddings.append(emb)
+                    time.sleep(0.5)
+                except Exception as e2:
+                    print(f"  ❌ Failed to get embedding: {e2}")
+                    # Use zero vector as fallback
+                    embeddings.append([0.0] * 1536)
+    
+    return embeddings
+
+
+def clean_query(query: str) -> str:
+    """Clean the query to make it more suitable for Wikipedia search."""
+    # Remove common question words
+    question_words = ['what', 'is', 'are', 'who', 'when', 'where', 'why', 'how', 'does', 'do', 'did', 'can', 'could', 'would', 'should']
+    
+    # Split into words and filter
+    words = query.lower().split()
+    cleaned_words = [w.strip('?.,!;:') for w in words if w.lower() not in question_words]
+    
+    return ' '.join(cleaned_words) if cleaned_words else query
+
+
 def search_wikipedia(query: str, max_results: int = 3) -> List[str]:
-    """Search Wikipedia and return relevant article titles."""
-    # Use Wikipedia search
-    search_results = wiki.search(query, results=max_results)
-    return search_results
+    """Search Wikipedia and return relevant article titles using MediaWiki API."""
+    # Clean the query for better search results
+    cleaned_query = clean_query(query)
+    
+    # Use MediaWiki API for search
+    url = "https://en.wikipedia.org/w/api.php"
+    params = {
+        "action": "opensearch",
+        "search": cleaned_query,
+        "limit": max_results,
+        "format": "json"
+    }
+    
+    headers = {
+        "User-Agent": "KnowledgeRAG/1.0 (https://github.com/skepee-PROTOTYPE/knowledge-rag; educational project)"
+    }
+    
+    try:
+        response = requests.get(url, params=params, headers=headers, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+        # opensearch returns: [query, [titles], [descriptions], [urls]]
+        titles = data[1] if len(data) > 1 else []
+        return titles
+    except Exception as e:
+        print(f"❌ Error searching Wikipedia: {e}")
+        import traceback
+        traceback.print_exc()
+        return []
 
 
 def get_wikipedia_content(title: str) -> Dict[str, str]:
@@ -115,7 +191,10 @@ def index_wikipedia_article(collection, article: Dict[str, str]):
             "chunk_id": i
         })
         ids.append(f"{article['title']}_chunk_{i}")
-        embeddings.append(get_embedding(chunk))
+    
+    # Get embeddings in batches
+    print(f"  🔄 Creating embeddings for {len(chunks)} chunks...")
+    embeddings = get_embeddings_batch(documents, batch_size=20)
     
     # Add to collection
     collection.add(
