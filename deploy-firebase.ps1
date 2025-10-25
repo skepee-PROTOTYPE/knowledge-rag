@@ -12,34 +12,34 @@ param(
     [string]$ServiceName = "knowledge-rag"
 )
 
-Write-Host "🚀 Knowledge RAG - Firebase + Cloud Run Deployment" -ForegroundColor Cyan
-Write-Host "================================================" -ForegroundColor Cyan
+Write-Host "==> Knowledge RAG - Firebase + Cloud Run Deployment" -ForegroundColor Cyan
+Write-Host "====================================================" -ForegroundColor Cyan
 Write-Host ""
 
 # Check prerequisites
-Write-Host "🔍 Checking prerequisites..." -ForegroundColor Yellow
+Write-Host "[CHECK] Checking prerequisites..." -ForegroundColor Yellow
 $gcloudExists = Get-Command gcloud -ErrorAction SilentlyContinue
 $dockerExists = Get-Command docker -ErrorAction SilentlyContinue
 
 if (-not $gcloudExists) {
-    Write-Host "❌ gcloud CLI not found. Install from: https://cloud.google.com/sdk/docs/install" -ForegroundColor Red
+    Write-Host "[ERROR] gcloud CLI not found. Install from: https://cloud.google.com/sdk/docs/install" -ForegroundColor Red
     exit 1
 }
 
 if (-not $dockerExists) {
-    Write-Host "❌ Docker not found. Install from: https://www.docker.com/products/docker-desktop" -ForegroundColor Red
+    Write-Host "[ERROR] Docker not found. Install from: https://www.docker.com/products/docker-desktop" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "✅ Prerequisites satisfied" -ForegroundColor Green
+Write-Host "[OK] Prerequisites satisfied" -ForegroundColor Green
 Write-Host ""
 
 # Set project
-Write-Host "📋 Setting GCP project to $ProjectId..." -ForegroundColor Yellow
+Write-Host "[SETUP] Setting GCP project to $ProjectId..." -ForegroundColor Yellow
 gcloud config set project $ProjectId
 
 # Enable required APIs
-Write-Host "🔧 Enabling required APIs..." -ForegroundColor Yellow
+Write-Host "[SETUP] Enabling required APIs..." -ForegroundColor Yellow
 gcloud services enable run.googleapis.com --quiet
 gcloud services enable containerregistry.googleapis.com --quiet
 gcloud services enable secretmanager.googleapis.com --quiet
@@ -47,7 +47,7 @@ gcloud services enable cloudbuild.googleapis.com --quiet
 gcloud services enable firebase.googleapis.com --quiet
 
 # Store secret
-Write-Host "🔐 Storing GitHub token in Secret Manager..." -ForegroundColor Yellow
+Write-Host "[SECRETS] Storing GitHub token in Secret Manager..." -ForegroundColor Yellow
 $secretExists = gcloud secrets list --filter="name:github-token" --format="value(name)" 2>$null
 if ($secretExists) {
     Write-Host "   Secret already exists, creating new version..." -ForegroundColor Gray
@@ -58,7 +58,7 @@ if ($secretExists) {
 }
 
 # Grant Cloud Run access to secret
-Write-Host "🔑 Granting Cloud Run access to secrets..." -ForegroundColor Yellow
+Write-Host "[SECRETS] Granting Cloud Run access to secrets..." -ForegroundColor Yellow
 $projectNumber = gcloud projects describe $ProjectId --format="value(projectNumber)"
 gcloud secrets add-iam-policy-binding github-token `
     --member="serviceAccount:${projectNumber}-compute@developer.gserviceaccount.com" `
@@ -66,15 +66,15 @@ gcloud secrets add-iam-policy-binding github-token `
     --quiet 2>$null
 
 # Build and deploy
-Write-Host "🏗️  Building container (this may take a few minutes)..." -ForegroundColor Yellow
+Write-Host "[BUILD] Building container (this may take a few minutes)..." -ForegroundColor Yellow
 gcloud builds submit --tag gcr.io/$ProjectId/$ServiceName --quiet
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Build failed" -ForegroundColor Red
+    Write-Host "[ERROR] Build failed" -ForegroundColor Red
     exit 1
 }
 
-Write-Host "🚢 Deploying to Cloud Run..." -ForegroundColor Yellow
+Write-Host "[DEPLOY] Deploying to Cloud Run..." -ForegroundColor Yellow
 gcloud run deploy $ServiceName `
     --image gcr.io/$ProjectId/$ServiceName `
     --platform managed `
@@ -91,21 +91,21 @@ gcloud run deploy $ServiceName `
     --quiet
 
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ Deployment failed" -ForegroundColor Red
+    Write-Host "[ERROR] Deployment failed" -ForegroundColor Red
     exit 1
 }
 
 # Get service URL
-$serviceUrl = gcloud run services describe $ServiceName --region $Region --format 'value(status.url)'
+$serviceUrl = gcloud run services describe $ServiceName --region $Region --format "value(status.url)"
 
 Write-Host ""
-Write-Host "✅ Deployment Complete!" -ForegroundColor Green
-Write-Host "================================================" -ForegroundColor Cyan
+Write-Host "[SUCCESS] Deployment Complete!" -ForegroundColor Green
+Write-Host "====================================================" -ForegroundColor Cyan
 Write-Host "Service URL: $serviceUrl" -ForegroundColor White
 Write-Host ""
 
 # Test endpoints
-Write-Host "🧪 Testing endpoints..." -ForegroundColor Yellow
+Write-Host "[TEST] Testing endpoints..." -ForegroundColor Yellow
 try {
     Write-Host "Testing stats endpoint..." -ForegroundColor Gray
     $statsResponse = Invoke-RestMethod -Uri "$serviceUrl/api/stats" -TimeoutSec 10
@@ -114,13 +114,13 @@ try {
     Write-Host "Testing ask endpoint..." -ForegroundColor Gray
     $askBody = @{ question = "What is Python?" } | ConvertTo-Json
     $askResponse = Invoke-RestMethod -Uri "$serviceUrl/api/ask" -Method Post -Body $askBody -ContentType "application/json" -TimeoutSec 30
-    Write-Host "✅ API is responding correctly" -ForegroundColor Green
+    Write-Host "[OK] API is responding correctly" -ForegroundColor Green
 } catch {
-    Write-Host "⚠️  API test failed (service may need a moment to warm up)" -ForegroundColor Yellow
+    Write-Host "[WARN] API test failed (service may need a moment to warm up)" -ForegroundColor Yellow
 }
 
 Write-Host ""
-Write-Host "📊 Cost Estimate (Free Tier):" -ForegroundColor Cyan
+Write-Host "[COSTS] Cost Estimate (Free Tier):" -ForegroundColor Cyan
 Write-Host "- Cloud Run: 2M requests/month FREE" -ForegroundColor White
 Write-Host "- Cloud Storage: 5GB FREE" -ForegroundColor White
 Write-Host "- Secret Manager: 6 active versions FREE" -ForegroundColor White
@@ -128,14 +128,14 @@ Write-Host "- Expected cost: `$0-5/month for low-moderate traffic" -ForegroundCo
 Write-Host ""
 
 Write-Host "Next Steps:" -ForegroundColor Cyan
-Write-Host "1. ✅ Backend deployed: $serviceUrl" -ForegroundColor White
+Write-Host "1. [OK] Backend deployed: $serviceUrl" -ForegroundColor White
 Write-Host "2. Optional - Configure Firebase Hosting:" -ForegroundColor White
 Write-Host "   - Run: firebase login" -ForegroundColor Gray
 Write-Host "   - Run: firebase init hosting" -ForegroundColor Gray
 Write-Host "   - Edit firebase.json to rewrite to Cloud Run" -ForegroundColor Gray
 Write-Host "   - Run: firebase deploy --only hosting" -ForegroundColor Gray
 Write-Host "3. Optional - Set up CI/CD (see FIREBASE_DEPLOYMENT.md step 7)" -ForegroundColor White
-Write-Host "4. Monitor logs: gcloud logging tail 'resource.type=cloud_run_revision'" -ForegroundColor White
+Write-Host "4. Monitor logs: gcloud logging tail `"resource.type=cloud_run_revision`"" -ForegroundColor White
 Write-Host ""
 Write-Host "Documentation:" -ForegroundColor Cyan
 Write-Host "- Full guide: FIREBASE_DEPLOYMENT.md" -ForegroundColor White
