@@ -37,9 +37,10 @@ if os.environ.get('FLASK_ENV') == 'production':
     logger.info("Running in production mode")
 
 # Initialize OpenAI client
+github_token = os.environ.get("GITHUB_TOKEN", "").strip()
 client = OpenAI(
     base_url="https://models.inference.ai.azure.com",
-    api_key=os.environ.get("GITHUB_TOKEN")
+    api_key=github_token
 )
 
 # Configuration
@@ -373,7 +374,7 @@ def get_stats():
 
 
 if __name__ == '__main__':
-    if not os.environ.get("GITHUB_TOKEN"):
+    if not github_token:
         print("❌ Error: GITHUB_TOKEN not found in environment variables")
         print("Please set GITHUB_TOKEN in .env file")
     else:

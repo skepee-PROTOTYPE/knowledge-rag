@@ -38,7 +38,8 @@ def set_security_headers(response):
     return response
 
 if __name__ == '__main__':
-    # This should not be used in production
-    # Use gunicorn: gunicorn -w 4 -b 0.0.0.0:8080 wsgi:app
-    print("Warning: Use a production WSGI server like Gunicorn")
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
+    # For Cloud Run, we use the built-in Flask server
+    # Cloud Run handles load balancing and scaling
+    port = int(os.environ.get('PORT', 8080))
+    print(f"🚀 Starting production server on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
