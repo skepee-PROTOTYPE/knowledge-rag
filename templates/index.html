@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Knowledge RAG - Wikipedia Research Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .stats {
+            background: rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .main-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+
+        .search-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        #questionInput {
+            flex: 1;
+            padding: 15px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+
+        #questionInput:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        #askButton {
+            padding: 15px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        #askButton:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        #askButton:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            display: none;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .result {
+            display: none;
+        }
+
+        .articles-found {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .articles-found h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 1em;
+        }
+
+        .articles-found ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .articles-found li {
+            padding: 5px 0;
+            color: #555;
+        }
+
+        .articles-found li:before {
+            content: "📚 ";
+            margin-right: 5px;
+        }
+
+        .answer-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            line-height: 1.8;
+        }
+
+        .answer-section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .answer-text {
+            color: #444;
+            white-space: pre-wrap;
+        }
+
+        .sources {
+            background: #fff;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .sources h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+
+        .source-item {
+            padding: 12px;
+            border-left: 3px solid #667eea;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            border-radius: 5px;
+        }
+
+        .source-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .source-link {
+            color: #667eea;
+            text-decoration: none;
+            font-size: 0.9em;
+            word-break: break-all;
+        }
+
+        .source-link:hover {
+            text-decoration: underline;
+        }
+
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 10px;
+            border-left: 4px solid #c33;
+            display: none;
+        }
+
+        .example-questions {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .example-questions h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+
+        .example-btn {
+            display: inline-block;
+            padding: 8px 15px;
+            margin: 5px;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.85em;
+            transition: all 0.2s;
+        }
+
+        .example-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 40px;
+            opacity: 0.9;
+        }
+
+        footer a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🧠 Knowledge RAG</h1>
+            <p class="subtitle">Wikipedia-Powered Research Assistant</p>
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-number" id="chunksCount">-</div>
+                    <div class="stat-label">Cached Chunks</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="articlesCount">-</div>
+                    <div class="stat-label">Cached Articles</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="main-card">
+            <div class="search-box">
+                <input 
+                    type="text" 
+                    id="questionInput" 
+                    placeholder="Ask me anything... (e.g., What is quantum computing?)"
+                    onkeypress="if(event.key==='Enter') askQuestion()"
+                >
+                <button id="askButton" onclick="askQuestion()">Ask</button>
+            </div>
+
+            <div class="example-questions">
+                <h4>💡 Try these examples:</h4>
+                <span class="example-btn" onclick="setQuestion('What is artificial intelligence?')">What is AI?</span>
+                <span class="example-btn" onclick="setQuestion('Explain quantum computing')">Quantum Computing</span>
+                <span class="example-btn" onclick="setQuestion('Who was Alan Turing?')">Alan Turing</span>
+                <span class="example-btn" onclick="setQuestion('What is climate change?')">Climate Change</span>
+            </div>
+
+            <div class="error" id="error"></div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Searching Wikipedia and analyzing content...</p>
+            </div>
+
+            <div class="result" id="result">
+                <div class="articles-found" id="articlesFound"></div>
+                
+                <div class="answer-section">
+                    <h2>📝 Answer</h2>
+                    <div class="answer-text" id="answer"></div>
+                </div>
+
+                <div class="sources">
+                    <h3>📚 Sources</h3>
+                    <div id="sources"></div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>Powered by Wikipedia & GitHub Models | <a href="https://github.com/skepee-PROTOTYPE/knowledge-rag" target="_blank">View on GitHub</a></p>
+        </footer>
+    </div>
+
+    <script>
+        // Load stats on page load
+        loadStats();
+
+        function loadStats() {
+            fetch('/api/stats')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('chunksCount').textContent = data.total_chunks.toLocaleString();
+                    document.getElementById('articlesCount').textContent = data.total_articles.toLocaleString();
+                })
+                .catch(() => {
+                    document.getElementById('chunksCount').textContent = '0';
+                    document.getElementById('articlesCount').textContent = '0';
+                });
+        }
+
+        function setQuestion(question) {
+            document.getElementById('questionInput').value = question;
+            askQuestion();
+        }
+
+        async function askQuestion() {
+            const question = document.getElementById('questionInput').value.trim();
+            
+            if (!question) {
+                showError('Please enter a question');
+                return;
+            }
+
+            // Hide previous results and errors
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('error').style.display = 'none';
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('askButton').disabled = true;
+
+            try {
+                const response = await fetch('/api/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ question })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to get answer');
+                }
+
+                displayResult(data);
+                loadStats(); // Refresh stats
+
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('askButton').disabled = false;
+            }
+        }
+
+        function displayResult(data) {
+            // Display articles found
+            if (data.articles_found && data.articles_found.length > 0) {
+                const articlesHTML = `
+                    <h3>📚 Wikipedia Articles Retrieved:</h3>
+                    <ul>
+                        ${data.articles_found.map(article => `<li>${article}</li>`).join('')}
+                    </ul>
+                `;
+                document.getElementById('articlesFound').innerHTML = articlesHTML;
+            }
+
+            // Display answer
+            document.getElementById('answer').textContent = data.answer;
+
+            // Display sources
+            const sourcesHTML = data.sources.map(source => `
+                <div class="source-item">
+                    <div class="source-title">[${source.index}] ${source.title}</div>
+                    <a href="${source.url}" target="_blank" class="source-link">${source.url}</a>
+                </div>
+            `).join('');
+            document.getElementById('sources').innerHTML = sourcesHTML;
+
+            // Show result
+            document.getElementById('result').style.display = 'block';
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = '❌ ' + message;
+            errorDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

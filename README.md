@@ -51,7 +51,22 @@ cp .env.example .env
 
 ## 🎯 Usage
 
-### Basic Wikipedia RAG
+### Web Interface (Recommended)
+
+```bash
+python app.py
+```
+
+Then open your browser to: **http://localhost:5000**
+
+Features:
+- 🌐 Clean, modern web interface
+- 💬 Real-time question answering
+- 📊 Cache statistics dashboard
+- 🔗 Clickable Wikipedia sources
+- 💡 Example questions to get started
+
+### Command Line Interface
 
 ```bash
 python wiki_rag.py
@@ -72,8 +87,11 @@ python access_db.py
 
 ```
 knowledge-rag/
-├── wiki_rag.py          # Main Wikipedia RAG implementation
+├── app.py               # Flask web application
+├── wiki_rag.py          # CLI Wikipedia RAG implementation
 ├── access_db.py         # Database inspection tool
+├── templates/
+│   └── index.html       # Web interface
 ├── requirements.txt     # Python dependencies
 ├── .env.example         # Environment variables template
 ├── .gitignore          # Git ignore rules
