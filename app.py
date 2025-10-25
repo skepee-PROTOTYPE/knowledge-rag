@@ -14,11 +14,27 @@ import requests
 import time
 import json
 from typing import List, Dict
+import logging
 
 # Load environment variables
 load_dotenv()
 
+# Configure logging
+logging.basicConfig(
+    level=os.environ.get('LOG_LEVEL', 'INFO'),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
+
+# Production configuration
+if os.environ.get('FLASK_ENV') == 'production':
+    app.config.update(
+        DEBUG=False,
+        TESTING=False,
+    )
+    logger.info("Running in production mode")
 
 # Initialize OpenAI client
 client = OpenAI(
@@ -250,12 +266,31 @@ def index():
 
 @app.route('/api/ask', methods=['POST'])
 def ask_question():
-    """Handle question submission."""
+    """Handle question submission with rate limiting and validation."""
+    # Apply rate limiting if available
+    try:
+        from rate_limiter import limiter
+        client_id = request.headers.get('X-Forwarded-For', request.remote_addr)
+        if not limiter.is_allowed(client_id, max_requests=10, window_seconds=60):
+            retry_after = limiter.get_retry_after(client_id, 60)
+            logger.warning(f"Rate limit exceeded for {client_id}")
+            return jsonify({
+                'error': 'Rate limit exceeded',
+                'retry_after': retry_after
+            }), 429
+    except ImportError:
+        logger.debug("Rate limiter not available")
+    
     data = request.json
     question = data.get('question', '').strip()
     
     if not question:
         return jsonify({'error': 'Question is required'}), 400
+    
+    if len(question) > 500:
+        return jsonify({'error': 'Question too long (max 500 characters)'}), 400
+    
+    logger.info(f"Processing question: {question[:100]}...")
     
     try:
         # Initialize ChromaDB
@@ -269,7 +304,10 @@ def ask_question():
         article_titles = search_wikipedia(question, max_results=3)
         
         if not article_titles:
+            logger.warning(f"No articles found for: {question}")
             return jsonify({'error': 'No Wikipedia articles found'}), 404
+        
+        logger.info(f"Found articles: {article_titles}")
         
         # Retrieve and index articles
         for title in article_titles:
@@ -293,6 +331,8 @@ def ask_question():
             for title, info in sources.items()
         ]
         
+        logger.info(f"Generated answer with {len(sources_list)} sources")
+        
         return jsonify({
             'answer': answer,
             'sources': sources_list,
@@ -300,7 +340,8 @@ def ask_question():
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        logger.error(f"Error processing question: {str(e)}", exc_info=True)
+        return jsonify({'error': 'Failed to process question'}), 500
 
 
 @app.route('/api/stats')
