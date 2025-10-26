@@ -108,10 +108,15 @@ def clean_query(query: str) -> str:
 
 
 def search_wikipedia(query: str, max_results: int = 3) -> List[str]:
-    """Search Wikipedia for relevant articles."""
+    """Search Wikipedia for relevant articles with enhanced fallback strategies."""
     cleaned_query = clean_query(query)
     
     url = "https://en.wikipedia.org/w/api.php"
+    headers = {
+        "User-Agent": "KnowledgeRAG/1.0 (educational project)"
+    }
+    
+    # Strategy 1: Try exact query first
     params = {
         "action": "opensearch",
         "search": cleaned_query,
@@ -119,16 +124,63 @@ def search_wikipedia(query: str, max_results: int = 3) -> List[str]:
         "format": "json"
     }
     
-    headers = {
-        "User-Agent": "KnowledgeRAG/1.0 (educational project)"
-    }
-    
     try:
         response = requests.get(url, params=params, headers=headers, timeout=10)
         response.raise_for_status()
         data = response.json()
-        return data[1] if len(data) > 1 else []
-    except:
+        results = data[1] if len(data) > 1 else []
+        
+        # If we got good results, return them
+        if len(results) >= max_results // 2:  # At least half the requested results
+            return results[:max_results]
+        
+        # Strategy 2: Try individual words from the query
+        words = cleaned_query.split()
+        if len(words) > 1:
+            for word in words:
+                if len(word) > 3:  # Skip short words
+                    params["search"] = word
+                    response = requests.get(url, params=params, headers=headers, timeout=10)
+                    response.raise_for_status()
+                    data = response.json()
+                    word_results = data[1] if len(data) > 1 else []
+                    
+                    # Add new results that aren't duplicates
+                    for result in word_results:
+                        if result not in results and len(results) < max_results:
+                            results.append(result)
+                    
+                    if len(results) >= max_results:
+                        break
+        
+        # Strategy 3: Try semantic variations for common topics
+        semantic_variations = {
+            'mobility transport': ['transport', 'transportation', 'mobility', 'public transport', 'sustainable transport'],
+            'machine learning': ['machine learning', 'artificial intelligence', 'deep learning'],
+            'climate change': ['climate change', 'global warming', 'environmental science'],
+            'space exploration': ['space exploration', 'spaceflight', 'astronomy', 'NASA']
+        }
+        
+        query_lower = cleaned_query.lower()
+        for key, variations in semantic_variations.items():
+            if key in query_lower and len(results) < max_results:
+                for variation in variations:
+                    if len(results) >= max_results:
+                        break
+                    params["search"] = variation
+                    response = requests.get(url, params=params, headers=headers, timeout=10)
+                    response.raise_for_status()
+                    data = response.json()
+                    var_results = data[1] if len(data) > 1 else []
+                    
+                    for result in var_results:
+                        if result not in results and len(results) < max_results:
+                            results.append(result)
+        
+        return results[:max_results]
+        
+    except Exception as e:
+        logger.error(f"Wikipedia search error: {e}")
         return []
 
 

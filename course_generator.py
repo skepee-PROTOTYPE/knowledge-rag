@@ -298,12 +298,14 @@ class WikipediaCourseSystem:
             return []
     
     def _search_wikipedia(self, query: str, max_results: int = 5) -> List[str]:
-        """Search Wikipedia for article titles."""
+        """Enhanced Wikipedia search with fallback strategies."""
         try:
             import requests
             
             # Use Wikipedia API to search for articles
             search_url = "https://en.wikipedia.org/api/rest_v1/page/search"
+            
+            # Strategy 1: Try exact query
             params = {
                 'q': query,
                 'limit': max_results
@@ -311,9 +313,52 @@ class WikipediaCourseSystem:
             
             response = requests.get(search_url, params=params, timeout=10)
             response.raise_for_status()
-            
             search_data = response.json()
-            return [page['title'] for page in search_data.get('pages', [])]
+            results = [page['title'] for page in search_data.get('pages', [])]
+            
+            # If we got good results, return them
+            if len(results) >= max_results // 2:
+                return results[:max_results]
+            
+            # Strategy 2: Try individual words
+            words = query.lower().split()
+            for word in words:
+                if len(word) > 3 and len(results) < max_results:  # Skip short words
+                    params['q'] = word
+                    response = requests.get(search_url, params=params, timeout=10)
+                    response.raise_for_status()
+                    search_data = response.json()
+                    
+                    for page in search_data.get('pages', []):
+                        if page['title'] not in results and len(results) < max_results:
+                            results.append(page['title'])
+            
+            # Strategy 3: Semantic variations for common topics
+            semantic_map = {
+                'mobility': ['transport', 'transportation', 'public transport', 'sustainable transport'],
+                'transport': ['mobility', 'transportation', 'public transport', 'traffic'],
+                'ai': ['artificial intelligence', 'machine learning', 'deep learning'],
+                'ml': ['machine learning', 'artificial intelligence', 'data science'],
+                'climate': ['climate change', 'global warming', 'environment'],
+                'space': ['space exploration', 'astronomy', 'spaceflight', 'NASA']
+            }
+            
+            query_words = query.lower().split()
+            for word in query_words:
+                if word in semantic_map and len(results) < max_results:
+                    for variation in semantic_map[word]:
+                        if len(results) >= max_results:
+                            break
+                        params['q'] = variation
+                        response = requests.get(search_url, params=params, timeout=10)
+                        response.raise_for_status()
+                        search_data = response.json()
+                        
+                        for page in search_data.get('pages', []):
+                            if page['title'] not in results and len(results) < max_results:
+                                results.append(page['title'])
+            
+            return results[:max_results]
             
         except Exception as e:
             print(f"Error searching Wikipedia: {e}")
