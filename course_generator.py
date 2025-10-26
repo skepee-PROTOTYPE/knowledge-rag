@@ -243,45 +243,80 @@ class CourseGenerator:
 class WikipediaCourseSystem:
     """Main interface for course generation using Wikipedia RAG."""
     
-    def __init__(self, app_instance):
-        """Initialize with existing app components."""
-        self.client = app_instance.client
-        self.wiki_rag = app_instance  # The app instance has RAG methods
+    def __init__(self, openai_client=None, chroma_client=None):
+        """Initialize with OpenAI and ChromaDB clients."""
+        import os
+        from openai import OpenAI
+        
+        if openai_client is None:
+            self.client = OpenAI(
+                base_url="https://models.inference.ai.azure.com",
+                api_key=os.environ.get("GITHUB_TOKEN", "").strip()
+            )
+        else:
+            self.client = openai_client
+            
+        self.chroma_client = chroma_client
         self.course_generator = CourseGenerator(self.client, self)
     
     def search_and_retrieve(self, query: str, top_k: int = 5) -> List[Dict]:
-        """Use existing RAG system to search and retrieve content."""
+        """Use Wikipedia API to search and retrieve content."""
         try:
-            # Use existing app methods
-            from app import search_wikipedia, get_wikipedia_content, semantic_search, get_persistent_client
+            import wikipediaapi
             
-            # Search Wikipedia for articles
-            article_titles = search_wikipedia(query, max_results=3)
-            
-            if not article_titles:
-                return []
-            
-            # Get ChromaDB collection
-            chroma_client = get_persistent_client()
-            collection = chroma_client.get_or_create_collection(
-                name="wikipedia_knowledge",
-                metadata={"description": "Wikipedia articles for RAG"}
+            # Initialize Wikipedia API
+            wiki = wikipediaapi.Wikipedia(
+                language='en',
+                extract_format=wikipediaapi.ExtractFormat.WIKI,
+                user_agent='KnowledgeRAG/1.0 (https://github.com/skepee-PROTOTYPE/knowledge-rag)'
             )
             
-            # Index articles if needed
-            for title in article_titles:
-                article = get_wikipedia_content(title)
-                if article:
-                    # Use existing indexing function
-                    from app import index_wikipedia_article
-                    index_wikipedia_article(collection, article)
+            # Search for articles
+            search_results = self._search_wikipedia(query, max_results=3)
+            chunks = []
             
-            # Search for relevant chunks
-            chunks = semantic_search(collection, query, top_k=top_k)
-            return chunks
+            for title in search_results:
+                try:
+                    # Get Wikipedia page
+                    page = wiki.page(title)
+                    if page.exists():
+                        # Split content into chunks
+                        content = page.text[:2000]  # Limit content length
+                        chunks.append({
+                            'text': content,
+                            'title': title,
+                            'url': page.fullurl
+                        })
+                except Exception as e:
+                    print(f"Error retrieving page {title}: {e}")
+                    continue
+            
+            return chunks[:top_k]
             
         except Exception as e:
             print(f"Error in search_and_retrieve: {e}")
+            return []
+    
+    def _search_wikipedia(self, query: str, max_results: int = 5) -> List[str]:
+        """Search Wikipedia for article titles."""
+        try:
+            import requests
+            
+            # Use Wikipedia API to search for articles
+            search_url = "https://en.wikipedia.org/api/rest_v1/page/search"
+            params = {
+                'q': query,
+                'limit': max_results
+            }
+            
+            response = requests.get(search_url, params=params, timeout=10)
+            response.raise_for_status()
+            
+            search_data = response.json()
+            return [page['title'] for page in search_data.get('pages', [])]
+            
+        except Exception as e:
+            print(f"Error searching Wikipedia: {e}")
             return []
     
     def create_course(self, topic: str, level: str = "beginner") -> Dict[str, Any]:

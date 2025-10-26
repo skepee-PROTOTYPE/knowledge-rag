@@ -414,8 +414,8 @@ def generate_course():
         
         logger.info(f"Generating course for topic: {topic} (level: {level})")
         
-        # Initialize course system with current app
-        course_system = WikipediaCourseSystem(globals())
+        # Initialize course system with OpenAI client
+        course_system = WikipediaCourseSystem(openai_client=client)
         
         # Generate course
         course_data = course_system.create_course(topic, level)
@@ -474,8 +474,8 @@ def generate_quiz():
         
         logger.info(f"Generating quiz for topic: {topic} ({num_questions} questions)")
         
-        # Initialize course system
-        course_system = WikipediaCourseSystem(globals())
+        # Initialize course system with OpenAI client
+        course_system = WikipediaCourseSystem(openai_client=client)
         
         # Generate quiz
         quiz_data = course_system.create_quiz(topic, num_questions)
