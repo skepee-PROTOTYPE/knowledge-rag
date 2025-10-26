@@ -70,75 +70,343 @@ class CourseGenerator:
             # Fallback if JSON parsing fails
             return self._parse_outline_text(response.choices[0].message.content, topic, level)
     
-    def generate_module_content(self, module_title: str, topics: List[str]) -> Dict[str, Any]:
-        """Generate detailed content for a specific module."""
+    def generate_module_content(self, module_title: str, topics: List[str], level: str = "beginner") -> Dict[str, Any]:
+        """Generate comprehensive detailed content for a specific module."""
+        
+        print(f"   📖 Generating content for: {module_title}")
         
         # Use the existing RAG system to gather relevant content
         module_content = {
             "title": module_title,
-            "sections": []
+            "overview": "",
+            "learning_objectives": [],
+            "lessons": [],
+            "assessments": [],
+            "additional_resources": []
         }
         
-        for topic in topics:
-            # Get relevant content from Wikipedia via RAG
-            retrieved_chunks = self.wiki_rag.search_and_retrieve(topic, top_k=3)
+        # Generate module overview and objectives
+        overview_chunks = self.wiki_rag.search_and_retrieve(module_title, top_k=5)
+        
+        overview_prompt = f"""Create a comprehensive module overview for "{module_title}" at {level} level.
+        
+        Use this Wikipedia content as reference:
+        {self._format_chunks(overview_chunks)}
+        
+        Provide:
+        1. Module Overview (3-4 sentences explaining what students will learn)
+        2. Learning Objectives (5-7 specific, measurable objectives)
+        3. Prerequisites (if any)
+        4. Estimated Duration
+        
+        Format as JSON:
+        {{
+            "overview": "...",
+            "learning_objectives": ["objective1", "objective2", ...],
+            "prerequisites": ["prerequisite1", ...],
+            "duration": "X hours"
+        }}
+        """
+        
+        try:
+            response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are an expert curriculum designer creating detailed educational content."},
+                    {"role": "user", "content": overview_prompt}
+                ],
+                temperature=0.6
+            )
             
-            # Generate structured content
-            content_prompt = f"""Create educational content for the topic "{topic}" as part of a module on "{module_title}".
+            overview_data = json.loads(response.choices[0].message.content)
+            module_content.update(overview_data)
+        except:
+            module_content["overview"] = f"This module covers {module_title} concepts and applications."
+            module_content["learning_objectives"] = [f"Understand {topic}" for topic in topics]
+        
+        # Generate detailed lessons for each topic
+        for i, topic in enumerate(topics, 1):
+            print(f"      📝 Lesson {i}: {topic}")
+            
+            # Get relevant content from Wikipedia via RAG
+            retrieved_chunks = self.wiki_rag.search_and_retrieve(topic, top_k=5)
+            
+            # Generate comprehensive lesson content
+            lesson_prompt = f"""Create a comprehensive lesson plan for "{topic}" as Lesson {i} in the module "{module_title}".
+            This is for {level} level learners.
             
             Use this Wikipedia content as reference:
             {self._format_chunks(retrieved_chunks)}
             
-            Structure the content with:
-            1. Introduction (2-3 sentences)
-            2. Key concepts (3-5 main points)
-            3. Detailed explanation
-            4. Real-world examples
-            5. Practice questions (3 questions)
+            Create a detailed lesson with:
             
-            Make it educational, engaging, and appropriate for learners.
+            1. **Lesson Introduction** (2-3 sentences)
+            2. **Key Learning Points** (5-7 main concepts students should understand)
+            3. **Detailed Content Sections** (3-4 sections with in-depth explanations, examples, and applications)
+            4. **Real-World Applications** (3-4 specific examples showing practical use)
+            5. **Interactive Activities** (2-3 hands-on activities or discussions)
+            6. **Knowledge Check Questions** (5 questions to test understanding)
+            7. **Further Reading** (3-4 recommended resources or Wikipedia links)
+            
+            Make the content:
+            - Educational and engaging
+            - Appropriate for {level} level
+            - Rich with examples and applications
+            - Interactive and practical
+            
+            Use markdown formatting for structure and readability.
             """
             
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "You are an expert educator creating course content."},
-                    {"role": "user", "content": content_prompt}
+                    {"role": "system", "content": "You are an expert educator creating comprehensive lesson content. Use clear structure and engaging educational techniques."},
+                    {"role": "user", "content": lesson_prompt}
                 ],
-                temperature=0.6
+                temperature=0.6,
+                max_tokens=3000
             )
             
-            module_content["sections"].append({
-                "topic": topic,
+            # Generate practice exercises for this lesson
+            exercises_prompt = f"""Create 3 practical exercises for the lesson on "{topic}" in {module_title}.
+            
+            For {level} level learners, create:
+            1. A hands-on activity or simulation
+            2. A problem-solving exercise with step-by-step solution
+            3. A creative project or real-world application task
+            
+            Each exercise should include:
+            - Clear instructions
+            - Expected outcomes
+            - Time estimate
+            - Difficulty level
+            
+            Format as structured text with clear sections.
+            """
+            
+            exercises_response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are an educational designer creating practical learning exercises."},
+                    {"role": "user", "content": exercises_prompt}
+                ],
+                temperature=0.7,
+                max_tokens=1500
+            )
+            
+            lesson_data = {
+                "lesson_number": i,
+                "title": topic,
+                "duration": "45-60 minutes",
                 "content": response.choices[0].message.content,
-                "sources": [chunk.get("url", "") for chunk in retrieved_chunks]
-            })
+                "exercises": exercises_response.choices[0].message.content,
+                "sources": [
+                    {
+                        "title": chunk.get("title", "Wikipedia Article"),
+                        "url": chunk.get("url", ""),
+                        "type": "reference"
+                    } for chunk in retrieved_chunks
+                ]
+            }
+            
+            module_content["lessons"].append(lesson_data)
+        
+        # Generate module assessment
+        assessment_prompt = f"""Create a comprehensive assessment for the module "{module_title}" covering topics: {', '.join(topics)}.
+        
+        For {level} level learners, create:
+        1. **Quiz Questions** (10 multiple choice questions)
+        2. **Short Answer Questions** (5 questions requiring 2-3 sentence responses)
+        3. **Project Assignment** (A practical project that applies the module concepts)
+        4. **Rubric** (Scoring criteria for the project)
+        
+        Make assessments challenging but appropriate for the level.
+        
+        Format as structured JSON:
+        {{
+            "quiz": [
+                {{
+                    "question": "...",
+                    "options": {{"A": "...", "B": "...", "C": "...", "D": "..."}},
+                    "correct_answer": "A",
+                    "explanation": "..."
+                }}
+            ],
+            "short_answer": [
+                {{
+                    "question": "...",
+                    "sample_answer": "...",
+                    "points": 5
+                }}
+            ],
+            "project": {{
+                "title": "...",
+                "description": "...",
+                "deliverables": ["...", "..."],
+                "timeline": "...",
+                "rubric": {{
+                    "criteria1": "description",
+                    "criteria2": "description"
+                }}
+            }}
+        }}
+        """
+        
+        try:
+            assessment_response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are an expert assessment designer creating fair and comprehensive evaluations."},
+                    {"role": "user", "content": assessment_prompt}
+                ],
+                temperature=0.5,
+                max_tokens=2000
+            )
+            
+            assessment_data = json.loads(assessment_response.choices[0].message.content)
+            module_content["assessments"] = assessment_data
+            
+        except Exception as e:
+            print(f"      ⚠️  Assessment generation failed: {e}")
+            module_content["assessments"] = {
+                "quiz": [],
+                "short_answer": [],
+                "project": {"title": f"Module Project: {module_title}", "description": "Apply the concepts learned in this module."}
+            }
+        
+        # Generate additional resources
+        resources_prompt = f"""Suggest additional learning resources for the module "{module_title}" covering {', '.join(topics)}.
+        
+        Provide:
+        1. **Recommended Wikipedia Articles** (5 relevant articles with brief descriptions)
+        2. **Interactive Simulations** (3 suggested interactive tools or simulations)
+        3. **Video Resources** (3 educational video topics that would complement the learning)
+        4. **Books/Papers** (3 academic or educational texts)
+        5. **Online Tools** (3 online tools, calculators, or platforms students could use)
+        
+        Format as structured text with clear categories.
+        """
+        
+        try:
+            resources_response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are an educational resource curator recommending high-quality learning materials."},
+                    {"role": "user", "content": resources_prompt}
+                ],
+                temperature=0.6,
+                max_tokens=1200
+            )
+            
+            module_content["additional_resources"] = resources_response.choices[0].message.content
+            
+        except Exception as e:
+            print(f"      ⚠️  Resources generation failed: {e}")
+            module_content["additional_resources"] = f"Explore related topics on Wikipedia and educational platforms."
         
         return module_content
     
     def create_full_course(self, topic: str, level: str = "beginner") -> Dict[str, Any]:
-        """Create a complete course with outline and content."""
+        """Create a comprehensive course with detailed outline and rich content."""
         
-        print(f"🎓 Generating course: {topic} ({level} level)")
+        print(f"🎓 Generating comprehensive course: {topic} ({level} level)")
         
-        # Step 1: Generate course outline
-        print("📋 Creating course outline...")
+        # Step 1: Generate enhanced course outline
+        print("📋 Creating detailed course outline...")
         outline = self.generate_course_outline(topic, level)
         
-        # Step 2: Generate content for each module
-        print("📚 Generating module content...")
+        # Step 2: Generate comprehensive content for each module
+        print("📚 Generating detailed module content...")
         full_course = outline.copy()
         full_course["modules_content"] = []
+        full_course["course_summary"] = {}
+        
+        total_lessons = 0
+        total_duration = 0
         
         for i, module in enumerate(outline.get("modules", []), 1):
             print(f"   📖 Module {i}: {module['title']}")
             
             module_content = self.generate_module_content(
                 module["title"], 
-                module.get("topics", [])
+                module.get("topics", []),
+                level
             )
             
             full_course["modules_content"].append(module_content)
+            
+            # Track course statistics
+            total_lessons += len(module_content.get("lessons", []))
+            try:
+                duration_str = module_content.get("duration", "2 hours")
+                hours = int(''.join(filter(str.isdigit, duration_str.split()[0])) or "2")
+                total_duration += hours
+            except:
+                total_duration += 2
+        
+        # Add course summary with statistics
+        full_course["course_summary"] = {
+            "total_modules": len(outline.get("modules", [])),
+            "total_lessons": total_lessons,
+            "estimated_total_duration": f"{total_duration} hours",
+            "level": level,
+            "completion_certificate": True,
+            "course_type": "Comprehensive Wikipedia-based Course"
+        }
+        
+        # Generate course completion project
+        print("🎯 Creating final course project...")
+        final_project_prompt = f"""Create a comprehensive final project for the course "{outline.get('course_title', topic)}" at {level} level.
+        
+        This project should:
+        1. Integrate concepts from all modules
+        2. Be practical and applicable to real-world scenarios
+        3. Be challenging but achievable for {level} learners
+        4. Include clear deliverables and timeline
+        
+        Course modules covered:
+        {[module['title'] for module in outline.get('modules', [])]}
+        
+        Format as JSON:
+        {{
+            "title": "...",
+            "description": "...",
+            "objectives": ["...", "..."],
+            "deliverables": ["...", "..."],
+            "timeline": "...",
+            "assessment_criteria": {{
+                "technical_accuracy": "...",
+                "creativity": "...",
+                "practical_application": "..."
+            }},
+            "bonus_challenges": ["...", "..."]
+        }}
+        """
+        
+        try:
+            project_response = self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You are an expert educational designer creating capstone projects that integrate learning."},
+                    {"role": "user", "content": final_project_prompt}
+                ],
+                temperature=0.6,
+                max_tokens=1500
+            )
+            
+            final_project = json.loads(project_response.choices[0].message.content)
+            full_course["final_project"] = final_project
+            
+        except Exception as e:
+            print(f"   ⚠️  Final project generation failed: {e}")
+            full_course["final_project"] = {
+                "title": f"Capstone Project: {topic}",
+                "description": f"Apply all concepts learned in this {topic} course to create a comprehensive project."
+            }
+        
+        print(f"✅ Course generation complete!")
+        print(f"   📊 {total_lessons} lessons across {len(outline.get('modules', []))} modules")
+        print(f"   ⏱️  Estimated duration: {total_duration} hours")
         
         return full_course
     
@@ -298,23 +566,28 @@ class WikipediaCourseSystem:
             return []
     
     def _search_wikipedia(self, query: str, max_results: int = 5) -> List[str]:
-        """Enhanced Wikipedia search with fallback strategies."""
+        """Enhanced Wikipedia search using opensearch API (same as main app)."""
         try:
             import requests
             
-            # Use Wikipedia API to search for articles
-            search_url = "https://en.wikipedia.org/api/rest_v1/page/search"
+            # Use the same API as the main app (opensearch)
+            url = "https://en.wikipedia.org/w/api.php"
+            headers = {
+                "User-Agent": "KnowledgeRAG/1.0 (educational project)"
+            }
             
             # Strategy 1: Try exact query
             params = {
-                'q': query,
-                'limit': max_results
+                "action": "opensearch",
+                "search": query,
+                "limit": max_results,
+                "format": "json"
             }
             
-            response = requests.get(search_url, params=params, timeout=10)
+            response = requests.get(url, params=params, headers=headers, timeout=10)
             response.raise_for_status()
-            search_data = response.json()
-            results = [page['title'] for page in search_data.get('pages', [])]
+            data = response.json()
+            results = data[1] if len(data) > 1 else []
             
             # If we got good results, return them
             if len(results) >= max_results // 2:
@@ -324,14 +597,15 @@ class WikipediaCourseSystem:
             words = query.lower().split()
             for word in words:
                 if len(word) > 3 and len(results) < max_results:  # Skip short words
-                    params['q'] = word
-                    response = requests.get(search_url, params=params, timeout=10)
+                    params['search'] = word
+                    response = requests.get(url, params=params, headers=headers, timeout=10)
                     response.raise_for_status()
-                    search_data = response.json()
+                    data = response.json()
+                    word_results = data[1] if len(data) > 1 else []
                     
-                    for page in search_data.get('pages', []):
-                        if page['title'] not in results and len(results) < max_results:
-                            results.append(page['title'])
+                    for result in word_results:
+                        if result not in results and len(results) < max_results:
+                            results.append(result)
             
             # Strategy 3: Semantic variations for common topics
             semantic_map = {
@@ -339,6 +613,8 @@ class WikipediaCourseSystem:
                 'transport': ['mobility', 'transportation', 'public transport', 'traffic'],
                 'ai': ['artificial intelligence', 'machine learning', 'deep learning'],
                 'ml': ['machine learning', 'artificial intelligence', 'data science'],
+                'machine': ['machine learning', 'artificial intelligence', 'automation'],
+                'learning': ['machine learning', 'education', 'training'],
                 'climate': ['climate change', 'global warming', 'environment'],
                 'space': ['space exploration', 'astronomy', 'spaceflight', 'NASA']
             }
@@ -349,14 +625,15 @@ class WikipediaCourseSystem:
                     for variation in semantic_map[word]:
                         if len(results) >= max_results:
                             break
-                        params['q'] = variation
-                        response = requests.get(search_url, params=params, timeout=10)
+                        params['search'] = variation
+                        response = requests.get(url, params=params, headers=headers, timeout=10)
                         response.raise_for_status()
-                        search_data = response.json()
+                        data = response.json()
+                        var_results = data[1] if len(data) > 1 else []
                         
-                        for page in search_data.get('pages', []):
-                            if page['title'] not in results and len(results) < max_results:
-                                results.append(page['title'])
+                        for result in var_results:
+                            if result not in results and len(results) < max_results:
+                                results.append(result)
             
             return results[:max_results]
             
