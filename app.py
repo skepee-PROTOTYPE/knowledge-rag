@@ -584,6 +584,27 @@ def generate_course_outline():
         return jsonify({'error': 'Failed to generate course outline'}), 500
 
 
+# Enhanced Course Generator Integration
+try:
+    from course_integration import CourseGeneratorIntegration, create_enhanced_course_routes
+    
+    # Initialize enhanced course generator
+    course_integration = CourseGeneratorIntegration(app)
+    create_enhanced_course_routes(app, course_integration)
+    
+    @app.route('/enhanced-course')
+    def enhanced_course_page():
+        """Serve enhanced course generator page."""
+        return render_template('enhanced_course.html')
+    
+    logger.info("Enhanced course generator integration successful")
+    
+except ImportError as e:
+    logger.warning(f"Enhanced course generator not available: {e}")
+except Exception as e:
+    logger.error(f"Error integrating enhanced course generator: {e}")
+
+
 if __name__ == '__main__':
     if not github_token:
         print("❌ Error: GITHUB_TOKEN not found in environment variables")

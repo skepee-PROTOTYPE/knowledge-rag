@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Course Generator - Knowledge RAG</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .generator-selection {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .generator-option {
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+
+        .generator-option:hover {
+            border-color: #667eea;
+            background: #f0f2ff;
+        }
+
+        .generator-option.selected {
+            border-color: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .generator-title {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .generator-description {
+            font-size: 0.9em;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+
+        .generator-features {
+            list-style: none;
+            font-size: 0.8em;
+        }
+
+        .generator-features li {
+            margin-bottom: 5px;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .generator-features li:before {
+            content: "✓";
+            position: absolute;
+            left: 0;
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .generator-option.selected .generator-features li:before {
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input[type="text"], select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .advanced-options {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .advanced-options.show {
+            display: block;
+        }
+
+        .toggle-advanced {
+            background: none;
+            border: none;
+            color: #667eea;
+            text-decoration: underline;
+            cursor: pointer;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            width: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            margin-right: 10px;
+            width: auto;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .source-preview {
+            background: #e8f4fd;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+
+        .source-preview h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .source-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 10px;
+        }
+
+        .source-item {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        .source-type {
+            background: #667eea;
+            color: white;
+            font-size: 0.7em;
+            padding: 2px 6px;
+            border-radius: 3px;
+            display: inline-block;
+            margin-bottom: 5px;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+
+        .course-output {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            display: none;
+        }
+
+        .course-header {
+            border-bottom: 2px solid #e1e5e9;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .course-title {
+            font-size: 2em;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .course-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .meta-item {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .meta-label {
+            font-size: 0.8em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .meta-value {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .course-content {
+            max-height: 600px;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .back-to-main {
+            color: white;
+            text-decoration: none;
+            margin-bottom: 20px;
+            display: inline-block;
+            padding: 10px 20px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 5px;
+            transition: background 0.3s ease;
+        }
+
+        .back-to-main:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        @media (max-width: 768px) {
+            .generator-selection {
+                grid-template-columns: 1fr;
+            }
+            
+            .course-meta {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-to-main">← Back to Main Search</a>
+        
+        <header>
+            <h1>Enhanced Course Generator</h1>
+            <p class="subtitle">Create comprehensive university-level courses from multiple authoritative sources</p>
+        </header>
+
+        <div class="card">
+            <h2>Select Course Generation Method</h2>
+            
+            <div class="generator-selection">
+                <div class="generator-option" data-type="basic">
+                    <div class="generator-title">Basic Generator</div>
+                    <div class="generator-description">
+                        Quick course generation using Wikipedia as the primary source.
+                    </div>
+                    <ul class="generator-features">
+                        <li>Wikipedia content</li>
+                        <li>Standard structure</li>
+                        <li>Fast generation</li>
+                        <li>Basic assessments</li>
+                    </ul>
+                </div>
+
+                <div class="generator-option selected" data-type="enhanced">
+                    <div class="generator-title">Enhanced Generator</div>
+                    <div class="generator-description">
+                        Comprehensive university-level courses from multiple authoritative sources.
+                    </div>
+                    <ul class="generator-features">
+                        <li>MIT OpenCourseWare</li>
+                        <li>Khan Academy</li>
+                        <li>Academic papers (arXiv)</li>
+                        <li>Stanford Encyclopedia</li>
+                        <li>University-level rigor</li>
+                        <li>Detailed assessments</li>
+                        <li>Required readings</li>
+                        <li>Capstone projects</li>
+                    </ul>
+                </div>
+            </div>
+
+            <form id="courseForm">
+                <div class="form-group">
+                    <label for="topic">Course Topic *</label>
+                    <input type="text" id="topic" name="topic" required 
+                           placeholder="e.g., Machine Learning, Quantum Physics, Philosophy of Mind">
+                </div>
+
+                <div class="form-group">
+                    <label for="level">Academic Level</label>
+                    <select id="level" name="level">
+                        <option value="university">University/Undergraduate</option>
+                        <option value="graduate">Graduate/Masters</option>
+                        <option value="advanced">Advanced/PhD</option>
+                        <option value="professional">Professional Development</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="quickModeOption" style="background: #fff3cd; padding: 15px; border-radius: 8px; border: 2px solid #ffc107;">
+                    <label style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="quickMode" name="quickMode" style="margin-right: 10px; width: auto;">
+                        <span>
+                            <strong>⚡ Quick Mode</strong> - Generate course faster (30-60 sec) with 3 modules instead of full course (2-5 min)
+                        </span>
+                    </label>
+                    <small style="display: block; margin-top: 5px; color: #856404;">
+                        💡 Recommended for testing. Quick mode uses fewer API calls and generates faster.
+                    </small>
+                </div>
+
+                <button type="button" class="toggle-advanced">Show Advanced Options</button>
+                
+                <div class="advanced-options" id="advancedOptions">
+                    <div class="form-group">
+                        <label for="courseType">Course Type</label>
+                        <select id="courseType" name="courseType">
+                            <option value="comprehensive">Comprehensive Course</option>
+                            <option value="intensive">Intensive Workshop</option>
+                            <option value="survey">Survey Course</option>
+                            <option value="specialized">Specialized Topics</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="duration">Course Duration</label>
+                        <select id="duration" name="duration">
+                            <option value="semester">Full Semester (15 weeks)</option>
+                            <option value="quarter">Quarter (10 weeks)</option>
+                            <option value="summer">Summer Session (6 weeks)</option>
+                            <option value="intensive">Intensive (2 weeks)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <button type="button" class="btn btn-secondary" onclick="previewSources()">
+                        Preview Sources
+                    </button>
+                    <button type="submit" class="btn">Generate Course</button>
+                </div>
+            </form>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Generating comprehensive course...</p>
+                <p><small>This may take 1-2 minutes for enhanced courses</small></p>
+            </div>
+
+            <div id="sourcePreview"></div>
+            <div id="messages"></div>
+        </div>
+
+        <div class="course-output" id="courseOutput">
+            <div class="course-header">
+                <h2 class="course-title" id="courseTitle"></h2>
+                <div class="course-meta" id="courseMeta"></div>
+            </div>
+            <div class="course-content" id="courseContent"></div>
+            
+            <div style="margin-top: 20px; text-align: center;">
+                <button class="btn btn-secondary" onclick="downloadCourse()">Download Course</button>
+                <button class="btn" onclick="generateAnother()">Generate Another Course</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedGenerator = 'enhanced';
+        let currentCourse = null;
+
+        // Generator selection
+        document.querySelectorAll('.generator-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.generator-option').forEach(opt => 
+                    opt.classList.remove('selected'));
+                this.classList.add('selected');
+                selectedGenerator = this.dataset.type;
+                
+                // Show/hide advanced options based on generator type
+                const advancedOptions = document.getElementById('advancedOptions');
+                if (selectedGenerator === 'enhanced') {
+                    document.querySelector('.toggle-advanced').style.display = 'block';
+                } else {
+                    advancedOptions.classList.remove('show');
+                    document.querySelector('.toggle-advanced').style.display = 'none';
+                }
+            });
+        });
+
+        // Toggle advanced options
+        document.querySelector('.toggle-advanced').addEventListener('click', function() {
+            const advancedOptions = document.getElementById('advancedOptions');
+            advancedOptions.classList.toggle('show');
+            this.textContent = advancedOptions.classList.contains('show') ? 
+                'Hide Advanced Options' : 'Show Advanced Options';
+        });
+
+        // Form submission
+        document.getElementById('courseForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            generateCourse();
+        });
+
+        async function previewSources() {
+            const topic = document.getElementById('topic').value.trim();
+            if (!topic) {
+                showMessage('Please enter a topic first.', 'error');
+                return;
+            }
+
+            showLoading(true, 'Searching for sources...');
+            
+            try {
+                const response = await fetch('/api/course/sources/preview', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ topic, max_sources: 5 })
+                });
+
+                const data = await response.json();
+                showLoading(false);
+
+                if (data.success) {
+                    displaySourcePreview(data.preview);
+                } else {
+                    showMessage('Failed to preview sources: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showLoading(false);
+                showMessage('Error previewing sources: ' + error.message, 'error');
+            }
+        }
+
+        async function generateCourse() {
+            const formData = new FormData(document.getElementById('courseForm'));
+            const topic = formData.get('topic').trim();
+            
+            if (!topic) {
+                showMessage('Please enter a topic.', 'error');
+                return;
+            }
+
+            const quickMode = document.getElementById('quickMode').checked;
+            const requestData = {
+                topic: topic,
+                level: formData.get('level'),
+                type: formData.get('courseType') || 'comprehensive',
+                quick_mode: quickMode
+            };
+
+            const estimatedTime = quickMode ? '30-60 seconds' : '2-5 minutes';
+            showLoading(true, `Generating ${quickMode ? 'quick' : 'comprehensive'} course... (est. ${estimatedTime})`);
+            clearMessages();
+
+            try {
+                let endpoint;
+                if (selectedGenerator === 'enhanced') {
+                    endpoint = '/api/course/enhanced';
+                } else {
+                    endpoint = '/api/generate_course';
+                }
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const data = await response.json();
+                showLoading(false);
+
+                if (data.success || data.course) {
+                    currentCourse = data.course || data;
+                    displayCourse(currentCourse);
+                    const mode = data.generation_mode || (quickMode ? 'quick' : 'comprehensive');
+                    showMessage(`Course generated successfully in ${mode} mode!`, 'success');
+                } else {
+                    showMessage('Failed to generate course: ' + (data.error || 'Unknown error'), 'error');
+                }
+            } catch (error) {
+                showLoading(false);
+                showMessage('Error generating course: ' + error.message, 'error');
+            }
+        }
+
+        function displaySourcePreview(preview) {
+            const container = document.getElementById('sourcePreview');
+            
+            if (!preview.top_sources || preview.top_sources.length === 0) {
+                container.innerHTML = `
+                    <div class="source-preview">
+                        <h4>No sources found for this topic</h4>
+                        <p>Consider trying a different topic or using the basic generator.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = `
+                <div class="source-preview">
+                    <h4>Available Sources for "${preview.topic}"</h4>
+                    <p>Found ${preview.total_sources_found} sources across multiple platforms</p>
+                    
+                    <div class="source-list">
+            `;
+
+            preview.top_sources.forEach(source => {
+                html += `
+                    <div class="source-item">
+                        <div class="source-type">${source.type}</div>
+                        <strong>${source.title}</strong>
+                        <p>${source.preview}</p>
+                        <small>Credibility: ${source.credibility_score}/1.0</small>
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
+
+        function displayCourse(course) {
+            document.getElementById('courseTitle').textContent = course.course_title || 'Generated Course';
+            
+            // Course metadata
+            const metaHtml = `
+                <div class="meta-item">
+                    <div class="meta-label">Level</div>
+                    <div class="meta-value">${course.level || 'University'}</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">Modules</div>
+                    <div class="meta-value">${course.modules ? course.modules.length : 'N/A'}</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">Sources</div>
+                    <div class="meta-value">${course.source_summary ? course.source_summary.total_sources : 'Multiple'}</div>
+                </div>
+                <div class="meta-item">
+                    <div class="meta-label">Generator</div>
+                    <div class="meta-value">${selectedGenerator === 'enhanced' ? 'Enhanced' : 'Basic'}</div>
+                </div>
+            `;
+            document.getElementById('courseMeta').innerHTML = metaHtml;
+
+            // Course content
+            let contentHtml = `
+                <h3>Course Description</h3>
+                <p>${course.description || 'Comprehensive course covering the specified topic.'}</p>
+                
+                <h3>Learning Objectives</h3>
+                <ul>
+            `;
+
+            if (course.learning_objectives && Array.isArray(course.learning_objectives)) {
+                course.learning_objectives.forEach(obj => {
+                    contentHtml += `<li>${obj}</li>`;
+                });
+            }
+
+            contentHtml += `</ul>`;
+
+            if (course.modules && Array.isArray(course.modules)) {
+                contentHtml += `<h3>Course Modules</h3>`;
+                course.modules.forEach((module, index) => {
+                    contentHtml += `
+                        <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 5px;">
+                            <h4>Module ${index + 1}: ${module.title}</h4>
+                            <p><strong>Duration:</strong> ${module.duration || 'N/A'}</p>
+                            
+                            ${module.lessons ? `
+                                <p><strong>Lessons:</strong> ${module.lessons.length}</p>
+                                <ul>
+                                    ${module.lessons.map(lesson => `<li>${lesson.title}</li>`).join('')}
+                                </ul>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+            }
+
+            if (course.bibliography && Array.isArray(course.bibliography)) {
+                contentHtml += `
+                    <h3>Bibliography</h3>
+                    <ul>
+                `;
+                course.bibliography.forEach(ref => {
+                    contentHtml += `<li><strong>${ref.title}</strong> (${ref.type}) - Credibility: ${ref.credibility}</li>`;
+                });
+                contentHtml += `</ul>`;
+            }
+
+            document.getElementById('courseContent').innerHTML = contentHtml;
+            document.getElementById('courseOutput').style.display = 'block';
+            
+            // Scroll to course output
+            document.getElementById('courseOutput').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function downloadCourse() {
+            if (!currentCourse) return;
+            
+            const dataStr = JSON.stringify(currentCourse, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `course_${currentCourse.course_title?.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'generated'}.json`;
+            link.click();
+        }
+
+        function generateAnother() {
+            document.getElementById('courseOutput').style.display = 'none';
+            document.getElementById('topic').value = '';
+            clearMessages();
+            document.getElementById('sourcePreview').innerHTML = '';
+            currentCourse = null;
+            document.getElementById('topic').focus();
+        }
+
+        function showLoading(show, message = 'Loading...') {
+            const loading = document.getElementById('loading');
+            if (show) {
+                loading.style.display = 'block';
+                loading.querySelector('p').textContent = message;
+            } else {
+                loading.style.display = 'none';
+            }
+        }
+
+        function showMessage(message, type) {
+            const messages = document.getElementById('messages');
+            messages.innerHTML = `<div class="${type}">${message}</div>`;
+            setTimeout(() => {
+                messages.innerHTML = '';
+            }, 5000);
+        }
+
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+        }
+
+        // Initialize
+        document.getElementById('topic').focus();
+    </script>
+</body>
+</html>

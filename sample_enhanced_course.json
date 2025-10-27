@@ -1,0 +1,23 @@
+{
+  "course_title": "Introduction to Data Science",
+  "description": "Comprehensive university-level course covering Data Science",
+  "modules": [
+    {
+      "module_number": 1,
+      "title": "Data Science Fundamentals",
+      "duration": "2 weeks",
+      "objectives": [
+        "Learn basic Data Science concepts"
+      ],
+      "topics": [
+        "Introduction to Data Science"
+      ]
+    }
+  ],
+  "sources_found": 4,
+  "source_types": [
+    "academic",
+    "research",
+    "educational"
+  ]
+}
